@@ -1,99 +1,147 @@
-// ══════════════════════════════════════════════════════════════
-// Refugio v3 — Backend
-// Stack: Express + Supabase + Ollama
-// Deploy: Railway / Render
-// Estructura: TODO EN RAÍZ
-// ══════════════════════════════════════════════════════════════
-
 require('dotenv').config()
 const express = require('express')
-const cors    = require('cors')
-const path    = require('path')
+const cors = require('cors')
+const path = require('path')
 const { createClient } = require('@supabase/supabase-js')
 
-const app  = express()
+const app = express()
 const PORT = process.env.PORT || 3000
 
-// ── Supabase ──
+// ─────────────────────────────
+// SUPABASE
+// ─────────────────────────────
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_KEY,
   { auth: { persistSession: false } }
 )
 
-// ── Ollama ──
-const OLLAMA_URL     = process.env.OLLAMA_URL || 'http://localhost:11434'
-const DEFAULT_MODEL  = process.env.OLLAMA_MODEL || 'llama3.2'
-const OLLAMA_API_KEY = process.env.OLLAMA_API_KEY || 'fad8216f251c475bbf47bb0223971154.H04nEMkLgiYq4JmYrx6KLGGu'
+// ─────────────────────────────
+// OPENROUTER (IA GRATIS)
+// ─────────────────────────────
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY
+const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
 
-// ── CORS ──
-const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '*').split(',')
+const DEFAULT_MODEL = 'meta-llama/llama-3.1-8b-instruct:free'
 
+// ─────────────────────────────
+// CORS
+// ─────────────────────────────
 app.use(cors({
-  origin: (origin, cb) => {
-    if (!origin || ALLOWED_ORIGINS.includes('*') || ALLOWED_ORIGINS.includes(origin)) {
-      return cb(null, true)
-    }
-    cb(new Error('CORS bloqueado'))
-  },
+  origin: '*',
   credentials: true
 }))
 
 app.use(express.json({ limit: '20kb' }))
 
-// ════════════════════════════════════════════════════════════════
-// 🔥 FRONTEND (CORRECTO: TODO EN RAÍZ)
-// ════════════════════════════════════════════════════════════════
-
-// archivos estáticos desde raíz
+// ─────────────────────────────
+// FRONTEND (RAÍZ)
+// ─────────────────────────────
 app.use(express.static(__dirname))
 
-// SPA fallback (IMPORTANTE para React/Vue/vanilla router)
 app.get('*', (_, res) => {
   res.sendFile(path.join(__dirname, 'index.html'))
 })
 
-// ════════════════════════════════════════════════════════════════
-// AUTH MIDDLEWARE
-// ════════════════════════════════════════════════════════════════
-
+// ─────────────────────────────
+// AUTH
+// ─────────────────────────────
 async function requireAuth(req, res, next) {
-  const token = req.headers.authorization?.replace('Bearer ', '')?.trim()
+  const token = req.headers.authorization?.replace('Bearer ', '')
   if (!token) return res.status(401).json({ error: 'No autorizado' })
 
-  try {
-    const { data: { user }, error } = await supabase.auth.getUser(token)
-    if (error || !user) return res.status(401).json({ error: 'Token inválido' })
+  const { data: { user }, error } = await supabase.auth.getUser(token)
 
-    req.user = user
-    next()
-  } catch {
-    res.status(401).json({ error: 'Error de autenticación' })
+  if (error || !user) {
+    return res.status(401).json({ error: 'Token inválido' })
   }
+
+  req.user = user
+  next()
 }
 
-// ════════════════════════════════════════════════════════════════
-// PROFILE
-// ════════════════════════════════════════════════════════════════
-
+// ─────────────────────────────
+// PROFILE SAFE
+// ─────────────────────────────
 async function getProfile(userId) {
   const { data } = await supabase
     .from('profiles')
     .select('*')
     .eq('id', userId)
-    .single()
+    .maybeSingle()
 
-  if (data) return data
-
-  const { data: created } = await supabase
-    .from('profiles')
-    .insert({ id: userId })
-    .select()
-    .single()
-
-  return created
+  return data || { is_premium: false }
 }
 
+// ─────────────────────────────
+// CHAT (OPENROUTER)
+// ─────────────────────────────
+app.post('/api/chat', requireAuth, async (req, res) => {
+  const { messages } = req.body
+
+  if (!messages?.length) {
+    return res.status(400).json({ error: 'messages requerido' })
+  }
+
+  const last = messages[messages.length - 1]
+
+  if (last?.role === 'user') {
+    await supabase.from('conversations').insert({
+      user_id: req.user.id,
+      role: 'user',
+      content: last.content
+    })
+  }
+
+  try {
+    const r = await fetch(OPENROUTER_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+        'HTTP-Referer': 'https://refugio-app',
+        'X-Title': 'Refugio v3'
+      },
+      body: JSON.stringify({
+        model: DEFAULT_MODEL,
+        messages
+      })
+    })
+
+    const data = await r.json()
+
+    const text = data?.choices?.[0]?.message?.content || 'Sin respuesta'
+
+    await supabase.from('conversations').insert({
+      user_id: req.user.id,
+      role: 'assistant',
+      content: text
+    })
+
+    res.json({ text })
+
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Error IA' })
+  }
+})
+
+// ─────────────────────────────
+// HISTORY
+// ─────────────────────────────
+app.get('/api/chat/history', requireAuth, async (req, res) => {
+  const { data } = await supabase
+    .from('conversations')
+    .select('role, content, created_at')
+    .eq('user_id', req.user.id)
+    .order('created_at', { ascending: true })
+
+  res.json({ history: data || [] })
+})
+
+// ─────────────────────────────
+// PROFILE
+// ─────────────────────────────
 app.get('/api/profile', requireAuth, async (req, res) => {
   const profile = await getProfile(req.user.id)
 
@@ -107,212 +155,14 @@ app.get('/api/profile', requireAuth, async (req, res) => {
   })
 })
 
-app.patch('/api/profile', requireAuth, async (req, res) => {
-  const { aiName, personality, userName } = req.body
-
-  const updates = {
-    updated_at: new Date().toISOString()
-  }
-
-  if (aiName) updates.ai_name = aiName
-  if (personality) updates.personality = personality
-  if (userName !== undefined) updates.username = userName
-
-  const { data, error } = await supabase
-    .from('profiles')
-    .update(updates)
-    .eq('id', req.user.id)
-    .select()
-    .single()
-
-  if (error) return res.status(500).json({ error: error.message })
-
-  res.json({ profile: data })
-})
-
-// ════════════════════════════════════════════════════════════════
-// CHAT
-// ════════════════════════════════════════════════════════════════
-
-app.get('/api/chat/history', requireAuth, async (req, res) => {
-  const profile = await getProfile(req.user.id)
-  const limit = profile?.is_premium ? 100 : 20
-
-  const { data } = await supabase
-    .from('conversations')
-    .select('role, content, created_at')
-    .eq('user_id', req.user.id)
-    .order('created_at', { ascending: true })
-    .limit(limit)
-
-  res.json({ history: data || [] })
-})
-
-app.post('/api/chat', requireAuth, async (req, res) => {
-  const { messages, systemPrompt, model } = req.body
-
-  if (!messages?.length) {
-    return res.status(400).json({ error: 'messages requerido' })
-  }
-
-  const profile = await getProfile(req.user.id)
-
-  const lastMsg = messages[messages.length - 1]
-  if (lastMsg?.role === 'user') {
-    await supabase.from('conversations').insert({
-      user_id: req.user.id,
-      role: 'user',
-      content: lastMsg.content
-    })
-  }
-
-  const baseUrl = OLLAMA_URL.replace(/\/$/, '')
-  const modelToUse = model || DEFAULT_MODEL
-
-  const ollamaMessages = systemPrompt
-    ? [{ role: 'system', content: systemPrompt }, ...messages]
-    : messages
-
-  try {
-    const r = await fetch(`${baseUrl}/api/chat`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(OLLAMA_API_KEY && { Authorization: `Bearer ${OLLAMA_API_KEY}` })
-      },
-      body: JSON.stringify({
-        model: modelToUse,
-        messages: ollamaMessages,
-        stream: false
-      })
-    })
-
-    if (!r.ok) {
-      const t = await r.text()
-      return res.status(500).json({ error: t })
-    }
-
-    const data = await r.json()
-    const text = data?.message?.content || ''
-
-    await supabase.from('conversations').insert({
-      user_id: req.user.id,
-      role: 'assistant',
-      content: text
-    })
-
-    res.json({ text })
-
-  } catch (err) {
-    res.status(500).json({ error: 'Error con Ollama' })
-  }
-})
-
-app.delete('/api/chat/history', requireAuth, async (req, res) => {
-  await supabase.from('conversations').delete().eq('user_id', req.user.id)
-  res.json({ ok: true })
-})
-
-// ════════════════════════════════════════════════════════════════
-// DIARY
-// ════════════════════════════════════════════════════════════════
-
-app.get('/api/diary', requireAuth, async (req, res) => {
-  const { data } = await supabase
-    .from('diary_entries')
-    .select('*')
-    .eq('user_id', req.user.id)
-    .order('created_at', { ascending: false })
-
-  res.json({ entries: data || [] })
-})
-
-app.post('/api/diary', requireAuth, async (req, res) => {
-  const { content } = req.body
-  if (!content) return res.status(400).json({ error: 'contenido requerido' })
-
-  const { data } = await supabase
-    .from('diary_entries')
-    .insert({ user_id: req.user.id, content })
-    .select()
-    .single()
-
-  res.json({ entry: data })
-})
-
-app.delete('/api/diary/:id', requireAuth, async (req, res) => {
-  await supabase
-    .from('diary_entries')
-    .delete()
-    .eq('id', req.params.id)
-    .eq('user_id', req.user.id)
-
-  res.json({ ok: true })
-})
-
-// ════════════════════════════════════════════════════════════════
-// PREMIUM
-// ════════════════════════════════════════════════════════════════
-
-app.post('/api/activate', requireAuth, async (req, res) => {
-  const code = (req.body.code || '').trim()
-
-  const { data: codeRow } = await supabase
-    .from('activation_codes')
-    .select('*')
-    .eq('code', code)
-    .is('used_by', null)
-    .single()
-
-  if (!codeRow) {
-    return res.status(400).json({ error: 'Código inválido' })
-  }
-
-  await supabase.from('profiles')
-    .update({ is_premium: true })
-    .eq('id', req.user.id)
-
-  res.json({ ok: true })
-})
-
-// ════════════════════════════════════════════════════════════════
-// OLLAMA STATUS
-// ════════════════════════════════════════════════════════════════
-
-app.get('/api/ollama/status', async (req, res) => {
-  try {
-    const r = await fetch(`${OLLAMA_URL}/api/version`)
-    const d = await r.json()
-    res.json({ online: true, version: d.version })
-  } catch {
-    res.json({ online: false })
-  }
-})
-
-app.get('/api/ollama/models', async (req, res) => {
-  try {
-    const r = await fetch(`${OLLAMA_URL}/api/tags`)
-    const d = await r.json()
-
-    res.json({
-      models: (d.models || []).map(m => ({ name: m.name })),
-      default: DEFAULT_MODEL
-    })
-  } catch {
-    res.json({ models: [] })
-  }
-})
-
-// ════════════════════════════════════════════════════════════════
+// ─────────────────────────────
 // HEALTH
-// ════════════════════════════════════════════════════════════════
-
+// ─────────────────────────────
 app.get('/api/health', (_, res) => {
   res.json({ ok: true })
 })
 
-// ════════════════════════════════════════════════════════════════
-
+// ─────────────────────────────
 app.listen(PORT, () => {
-  console.log(`Servidor corriendo en http://localhost:${PORT}`)
+  console.log(`Servidor listo en http://localhost:${PORT}`)
 })
