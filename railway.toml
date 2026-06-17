@@ -1,0 +1,15 @@
+# ════════════════════════════════════════════════════════════════
+# railway.toml — Configuración de deploy en Railway
+# Sube la carpeta raíz del proyecto a Railway
+# ════════════════════════════════════════════════════════════════
+
+[build]
+builder = "NIXPACKS"
+
+[deploy]
+startCommand = "npm start"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
+
+[[services]]
+name = "refugio-backend"
