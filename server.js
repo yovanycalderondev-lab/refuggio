@@ -62,15 +62,26 @@ async function getProfile(userId) {
   return data || { is_premium: false }
 }
 
+// Auth opcional: identifica al usuario si manda token, pero deja pasar
+// a los invitados (sin token) en vez de bloquearlos con 401.
+async function optionalAuth(req, res, next) {
+  const token = req.headers.authorization?.replace('Bearer ', '').trim()
+  if (!token) { req.user = null; return next() }
+
+  const { data: { user }, error } = await supabase.auth.getUser(token)
+  req.user = (!error && user) ? user : null
+  next()
+}
+
 // ════════════════════════════════════════════════════════════════
 // CHAT — OpenRouter, con system prompt y modelo seleccionable
 // ════════════════════════════════════════════════════════════════
-app.post('/api/chat', requireAuth, async (req, res) => {
+app.post('/api/chat', optionalAuth, async (req, res) => {
   const { messages, systemPrompt, model } = req.body
   if (!messages?.length) return res.status(400).json({ error: 'messages requerido' })
 
   const last = messages[messages.length - 1]
-  if (last?.role === 'user') {
+  if (req.user && last?.role === 'user') {
     await supabase.from('conversations').insert({ user_id: req.user.id, role: 'user', content: last.content })
   }
 
