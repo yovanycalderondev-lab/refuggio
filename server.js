@@ -22,9 +22,9 @@ const supabase = createClient(
 )
 
 // ── Ollama ──
-const OLLAMA_URL     = process.env.OLLAMA_URL || 'http://localhost:11434'
+const OLLAMA_URL     = process.env.OLLAMA_URL || 'https://refuggio.onrender.com/'
 const DEFAULT_MODEL  = process.env.OLLAMA_MODEL || 'llama3.2'
-const OLLAMA_API_KEY = process.env.OLLAMA_API_KEY || ''
+const OLLAMA_API_KEY = process.env.OLLAMA_API_KEY || 'fad8216f251c475bbf47bb0223971154.H04nEMkLgiYq4JmYrx6KLGGu'
 
 // ── CORS ──
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '*').split(',')
