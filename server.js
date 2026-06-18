@@ -17,23 +17,33 @@ const supabase = createClient(
 )
 
 // ─────────────────────────────
-// OPENROUTER (IA)
+// OLLAMA CLOUD (IA)
 // ─────────────────────────────
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY
-const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
-const DEFAULT_MODEL = 'meta-llama/llama-3.1-8b-instruct:free'
+const OLLAMA_API_KEY = process.env.OLLAMA_API_KEY
+const OLLAMA_BASE_URL = 'https://ollama.com/v1'
+const OLLAMA_CHAT_URL = `${OLLAMA_BASE_URL}/chat/completions`
+const OLLAMA_MODELS_URL = `${OLLAMA_BASE_URL}/models`
+const DEFAULT_MODEL = 'gpt-oss:20b-cloud'
 
-// Modelos gratuitos disponibles (se muestran en Ajustes → Modelo)
-const FREE_MODELS = [
-  { name: 'meta-llama/llama-3.1-8b-instruct:free', size: 'rápido' },
-  { name: 'meta-llama/llama-3.2-3b-instruct:free',  size: 'ligero' },
-  { name: 'google/gemma-2-9b-it:free',              size: 'equilibrado' },
-  { name: 'mistralai/mistral-7b-instruct:free',      size: 'rápido' },
-  { name: 'qwen/qwen-2.5-7b-instruct:free',          size: 'ligero' },
+// Modelos de respaldo si no se puede consultar el catálogo en vivo de Ollama
+const FALLBACK_MODELS = [
+  { name: 'gpt-oss:20b-cloud',       size: 'rápido' },
+  { name: 'gpt-oss:120b-cloud',      size: 'potente' },
+  { name: 'qwen3-coder:480b-cloud',  size: 'potente' },
+  { name: 'deepseek-v3.1:671-cloud', size: 'muy potente' },
 ]
-const FREE_MODEL_NAMES = FREE_MODELS.map(m => m.name)
 
-if (!OPENROUTER_API_KEY) console.warn('⚠️  OPENROUTER_API_KEY no configurada')
+function sizeHint(name) {
+  const m = name.match(/(\d+)b/i)
+  if (!m) return ''
+  const n = parseInt(m[1], 10)
+  if (n >= 200) return 'muy potente'
+  if (n >= 60) return 'potente'
+  if (n >= 20) return 'equilibrado'
+  return 'rápido'
+}
+
+if (!OLLAMA_API_KEY) console.warn('⚠️  OLLAMA_API_KEY no configurada')
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) console.warn('⚠️  Supabase no configurado')
 
 // ─────────────────────────────
@@ -74,7 +84,7 @@ async function optionalAuth(req, res, next) {
 }
 
 // ════════════════════════════════════════════════════════════════
-// CHAT — OpenRouter, con system prompt y modelo seleccionable
+// CHAT — Ollama Cloud, con system prompt y modelo seleccionable
 // ════════════════════════════════════════════════════════════════
 app.post('/api/chat', optionalAuth, async (req, res) => {
   const { messages, systemPrompt, model } = req.body
@@ -85,8 +95,7 @@ app.post('/api/chat', optionalAuth, async (req, res) => {
     await supabase.from('conversations').insert({ user_id: req.user.id, role: 'user', content: last.content })
   }
 
-  // Usar el modelo pedido solo si es uno de los permitidos; si no, el default
-  const modelToUse = FREE_MODEL_NAMES.includes(model) ? model : DEFAULT_MODEL
+  const modelToUse = model || DEFAULT_MODEL
 
   const orMessages = systemPrompt
     ? [{ role: 'system', content: systemPrompt }, ...messages]
@@ -94,15 +103,13 @@ app.post('/api/chat', optionalAuth, async (req, res) => {
 
   try {
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 30000)
+    const timeout = setTimeout(() => controller.abort(), 45000)
 
-    const r = await fetch(OPENROUTER_URL, {
+    const r = await fetch(OLLAMA_CHAT_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-        'HTTP-Referer': 'https://refuggio.onrender.com',
-        'X-Title': 'Refugio'
+        'Authorization': `Bearer ${OLLAMA_API_KEY}`
       },
       body: JSON.stringify({ model: modelToUse, messages: orMessages }),
       signal: controller.signal
@@ -112,15 +119,17 @@ app.post('/api/chat', optionalAuth, async (req, res) => {
     const data = await r.json()
 
     if (!r.ok) {
-      console.error('[OpenRouter] Error', r.status, data?.error?.message)
-      const code = r.status === 401 ? 'INVALID_API_KEY' : r.status === 429 ? 'RATE_LIMIT' : 'OPENROUTER_ERROR'
-      return res.status(r.status).json({ error: data?.error?.message || 'Error de OpenRouter', code })
+      console.error('[Ollama] Error', r.status, data?.error?.message)
+      const code = r.status === 401 ? 'INVALID_API_KEY' : r.status === 429 ? 'RATE_LIMIT' : 'OLLAMA_ERROR'
+      return res.status(r.status).json({ error: data?.error?.message || 'Error de Ollama', code })
     }
 
     const text = data?.choices?.[0]?.message?.content
     if (!text) return res.status(500).json({ error: 'Respuesta vacía', code: 'EMPTY_RESPONSE' })
 
-    await supabase.from('conversations').insert({ user_id: req.user.id, role: 'assistant', content: text })
+    if (req.user) {
+      await supabase.from('conversations').insert({ user_id: req.user.id, role: 'assistant', content: text })
+    }
     res.json({ text, model: modelToUse })
 
   } catch (err) {
@@ -266,19 +275,37 @@ app.post('/api/activate', requireAuth, async (req, res) => {
 // ─────────────────────────────
 // ESTADO / MODELOS (panel de Ajustes)
 // ─────────────────────────────
-app.get('/api/ollama/status', (_, res) => {
-  res.json({ online: !!OPENROUTER_API_KEY, version: 'OpenRouter' })
+app.get('/api/ollama/status', async (_, res) => {
+  if (!OLLAMA_API_KEY) return res.json({ online: false, version: 'Ollama Cloud' })
+  try {
+    const r = await fetch(OLLAMA_MODELS_URL, { headers: { 'Authorization': `Bearer ${OLLAMA_API_KEY}` } })
+    res.json({ online: r.ok, version: 'Ollama Cloud' })
+  } catch (_) {
+    res.json({ online: false, version: 'Ollama Cloud' })
+  }
 })
 
-app.get('/api/ollama/models', (_, res) => {
-  res.json({ models: FREE_MODELS, default: DEFAULT_MODEL })
+app.get('/api/ollama/models', async (_, res) => {
+  if (!OLLAMA_API_KEY) return res.json({ models: FALLBACK_MODELS, default: DEFAULT_MODEL })
+  try {
+    const r = await fetch(OLLAMA_MODELS_URL, { headers: { 'Authorization': `Bearer ${OLLAMA_API_KEY}` } })
+    const data = await r.json()
+    const list = data?.data
+    if (!r.ok || !Array.isArray(list) || !list.length) {
+      return res.json({ models: FALLBACK_MODELS, default: DEFAULT_MODEL })
+    }
+    const models = list.map(m => ({ name: m.id, size: sizeHint(m.id) }))
+    res.json({ models, default: DEFAULT_MODEL })
+  } catch (_) {
+    res.json({ models: FALLBACK_MODELS, default: DEFAULT_MODEL })
+  }
 })
 
 // ─────────────────────────────
 // HEALTH
 // ─────────────────────────────
 app.get('/api/health', (_, res) => {
-  res.json({ ok: true, engine: 'openrouter', db: !!process.env.SUPABASE_URL })
+  res.json({ ok: true, engine: 'ollama-cloud', db: !!process.env.SUPABASE_URL })
 })
 
 // ─────────────────────────────
@@ -290,6 +317,6 @@ app.get('*', (_, res) => {
 
 app.listen(PORT, () => {
   console.log(`🌿 Refugio en http://localhost:${PORT}`)
-  console.log(`🤖 Motor: OpenRouter | Key: ${OPENROUTER_API_KEY ? '✓' : '✗ FALTA'}`)
+  console.log(`🤖 Motor: Ollama Cloud | Key: ${OLLAMA_API_KEY ? '✓' : '✗ FALTA'}`)
   console.log(`🗄️  Supabase: ${process.env.SUPABASE_URL ? '✓' : '✗ FALTA'}`)
 })

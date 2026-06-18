@@ -589,12 +589,10 @@ em{font-style:italic}
           <div class="fg"><label>Modelo</label>
             <div class="msr">
               <select id="s-ollama-model">
-                <option value="llama3.2">llama3.2 (recomendado)</option>
-                <option value="llama3.2:1b">llama3.2:1b (ultra ligero)</option>
-                <option value="mistral">mistral</option>
-                <option value="gemma3">gemma3</option>
-                <option value="phi3">phi3</option>
-                <option value="qwen2.5:1.5b">qwen2.5:1.5b (mínimo)</option>
+                <option value="gpt-oss:20b-cloud">gpt-oss:20b-cloud (recomendado)</option>
+                <option value="gpt-oss:120b-cloud">gpt-oss:120b-cloud (potente)</option>
+                <option value="qwen3-coder:480b-cloud">qwen3-coder:480b-cloud (potente)</option>
+                <option value="deepseek-v3.1:671-cloud">deepseek-v3.1:671-cloud (muy potente)</option>
               </select>
               <button class="bico" id="o-models" title="Cargar modelos">↺</button>
             </div>
@@ -647,7 +645,7 @@ const IS_CONFIGURED = !CONFIG.SUPABASE_URL.includes('XXXXXXXX')
 // ── ESTADO GLOBAL ──
 const S = {
   userName:'', aiName:'Luna', personality:'tranquila',
-  theme:'light', ollamaUrl:'', ollamaModel:'llama3.2',
+  theme:'light', ollamaUrl:'', ollamaModel:'gpt-oss:20b-cloud',
   isAuthenticated: false, isPremium: false, isGuest: false,
   userId: null, userEmail: '', userAvatar: '', userDisplayName: '',
 };
@@ -1361,7 +1359,7 @@ async function initApp() {
   applyTheme(savedTheme||(window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'))
 
   // Ollama settings desde localStorage
-  try{const o=JSON.parse(localStorage.getItem('refugio_ollama')||'null');if(o){S.ollamaUrl=o.url||'';S.ollamaModel=o.model||'llama3.2'}}catch(_){}
+  try{const o=JSON.parse(localStorage.getItem('refugio_ollama')||'null');if(o){S.ollamaUrl=o.url||'';S.ollamaModel=o.model||'gpt-oss:20b-cloud'}}catch(_){}
 }
 
 // ════════════════════════════════════════════════════════════
