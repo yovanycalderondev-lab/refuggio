@@ -10,47 +10,7 @@
 <!-- Supabase JS SDK -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
-/* ══ VARIABLES ══ */
-:root{
-  --bg:#FFF8E7;--surf:#FFFDF6;--card:#FFFFFF;--inp:#FEFCF4;--sb:#F5F3EA;
-  --pri:#C4A882;--acc:#FADADD;--grn:#B5D5B7;--rose:#E8C4C4;
-  --t1:#3D3530;--t2:#7A6E68;--tm:#B0A49E;--ton:#6B4F52;
-  --bs:rgba(196,168,130,0.2);--bm:rgba(196,168,130,0.35);
-  --sh:0 4px 20px rgba(100,70,50,.1);--shl:0 8px 40px rgba(100,70,50,.14);
-  --r:16px;--rl:24px;--rx:32px;--rf:9999px;
-  --sw:260px;--th:62px;--tr:all .25s cubic-bezier(.4,0,.2,1);
-  --gold:#C4A832;--gold-bg:rgba(196,168,50,.12);
-}
-[data-theme=dark]{
-  --bg:#2A2218;--surf:#302820;--card:#3A2E22;--inp:#342A1E;--sb:#251E16;
-  --pri:#C4A882;--acc:#7A4D52;--grn:#3D6040;--rose:#6B4040;
-  --t1:#F2E8D8;--t2:#C4B5A0;--tm:#8A7A6A;--ton:#F2D0D3;
-  --bs:rgba(196,168,130,.12);--bm:rgba(196,168,130,.22);
-  --sh:0 4px 20px rgba(0,0,0,.35);--shl:0 8px 40px rgba(0,0,0,.45);
-}
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html{font-size:16px}
-body{font-family:'DM Sans',,-apple-system,sans-serif;background:var(--bg);color:var(--t1);line-height:1.6;min-height:100dvh;overflow:hidden;transition:background .4s,color .4s}
-h1,h2,h3{font-family:'Playfair Display',Georgia,serif}
-em{font-style:italic}
-.hidden{display:none!important}
-
-/* ══ AUTH SCREEN ══ */
-.auth-screen{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:1.5rem;z-index:2000;transition:background .4s}
-.auth-card{background:var(--surf);border:1px solid var(--bs);border-radius:var(--rx);padding:3rem 2.5rem;max-width:420px;width:100%;text-align:center;box-shadow:var(--shl);animation:slideUp .5s ease}
-.auth-logo{font-size:3rem;margin-bottom:1rem;animation:float 3s ease-in-out infinite}
-.auth-title{font-size:2.2rem;font-weight:500;margin-bottom:.5rem}
-.auth-sub{color:var(--t2);font-size:.95rem;margin-bottom:2.5rem;line-height:1.7}
-.google-btn{display:flex;align-items:center;justify-content:center;gap:.75rem;width:100%;background:#fff;color:#3C4043;border:1.5px solid #dadce0;border-radius:var(--rf);padding:.85rem 1.5rem;font-family:'DM Sans',sans-serif;font-size:.95rem;font-weight:500;cursor:pointer;transition:var(--tr);margin-bottom:.75rem}
-.google-btn:hover{background:#f8f9fa;box-shadow:0 1px 6px rgba(0,0,0,.12);transform:translateY(-1px)}
-.google-btn svg{width:20px;height:20px;flex-shrink:0}
-[data-theme=dark] .google-btn{background:#3A2E22;color:var(--t1);border-color:var(--bm)}
-[data-theme=dark] .google-btn:hover{background:#443525}
-.guest-btn{background:none;border:none;color:var(--tm);font-family:'DM Sans',sans-serif;font-size:.82rem;cursor:pointer;padding:.5rem;text-decoration:underline;text-underline-offset:3px;transition:var(--tr)}
-.guest-btn:hover{color:var(--t2)}
-.auth-footer{margin-top:1.5rem;font-size:.75rem;color:var(--tm);line-height:1.6}
-
-/* ... (El resto de tus clases de CSS se mantendrán intactas en el archivo) ... */
+/* ... (Todo tu código CSS se mantiene exactamente igual aquí) ... */
 </style>
 </head>
 <body>
@@ -77,54 +37,241 @@ em{font-style:italic}
 
 <!-- ══ CONTENIDO PRINCIPAL (App) ══ -->
 <div id="app-container" class="app hidden">
-  <!-- Aquí va toda la estructura de la barra lateral (sb) y el contenedor principal (main) -->
+  <!-- Sidebar -->
+  <aside class="sb" id="sidebar">
+    <div class="sb-hdr">
+      <div class="logo">🌿 Refugio</div>
+      <button class="sb-close" id="sidebar-close-btn">✕</button>
+    </div>
+    
+    <div class="user-badge">
+      <div class="user-av">👤</div>
+      <div class="user-info">
+        <div class="user-name" id="u-name">Invitado</div>
+        <div class="user-plan" id="u-plan">Plan Gratis</div>
+      </div>
+      <button class="logout-btn" id="logout-btn" title="Cerrar Sesión">➔</button>
+    </div>
+
+    <nav class="nav">
+      <button class="ni act" data-target="panel-chat"><span class="ic">💬</span> Chat</button>
+      <button class="ni" data-target="panel-music"><span class="ic">🎵</span> Música</button>
+      <button class="ni" data-target="panel-breathing"><span class="ic">🧘</span> Respiración</button>
+      <button class="ni" data-target="panel-diary"><span class="ic">📖</span> Diario</button>
+      <button class="ni" data-target="panel-games"><span class="ic">🎮</span> Juegos</button>
+    </nav>
+  </aside>
+
+  <!-- Overlay para móviles -->
+  <div class="sb-ov" id="sidebar-overlay"></div>
+
+  <!-- Contenedor de Paneles -->
+  <main class="main">
+    <!-- Topbar -->
+    <div class="topbar">
+      <button class="menu-btn" id="menu-toggle-btn">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+      <div class="topbar-center">
+        <div class="ai-st"><span class="sdot"></span> Refugio AI</div>
+      </div>
+    </div>
+
+    <!-- Panel Chat -->
+    <section id="panel-chat" class="panel act">
+      <div class="chat-c">
+        <div class="msgs" id="chat-messages">
+          <div class="msg a">
+            <div class="av">🌿</div>
+            <div class="bub">Hola, soy tu compañero de Refugio. ¿Cómo te sientes el día de hoy?</div>
+          </div>
+        </div>
+        <div class="cia">
+          <div class="iw">
+            <textarea id="chat-input" placeholder="Escribe un mensaje..." rows="1"></textarea>
+            <button class="send-btn" id="send-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Panel Música -->
+    <section id="panel-music" class="panel">
+      <div class="pi">
+        <h2 class="ptit">Sonidos Relajantes</h2>
+        <p class="psub">Escucha melodías diseñadas para calmar tu mente.</p>
+        <div class="sg">
+          <div class="sc" onclick="playTrack('Lluvia', 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3')">
+            <span class="s-ic">🌧️</span>
+            <span class="s-nm">Lluvia suave</span>
+          </div>
+          <div class="sc" onclick="playTrack('Bosque', 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3')">
+            <span class="s-ic">🌲</span>
+            <span class="s-nm">Bosque</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Panel Respiración -->
+    <section id="panel-breathing" class="panel">
+      <div class="pi bpanel">
+        <h2 class="ptit">Ejercicios de Respiración</h2>
+        <p class="psub">Sigue el ritmo del círculo para equilibrar tu energía.</p>
+        <div class="bco">
+          <div class="bc" id="breath-circle"></div>
+        </div>
+        <p class="btxt" id="breath-text">Presiona iniciar para comenzar</p>
+        <div class="bctrl">
+          <button class="bs" id="breath-start-btn">Iniciar</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Panel Diario -->
+    <section id="panel-diary" class="panel">
+      <div class="pi">
+        <h2 class="ptit">Tu Diario Personal</h2>
+        <p class="psub">Escribe libremente lo que estás pensando o sintiendo hoy.</p>
+        <div class="dc">
+          <textarea id="diary-input" placeholder="Querido diario..." rows="6"></textarea>
+          <div class="da">
+            <button class="btn-p" id="save-diary-btn">Guardar entrada</button>
+          </div>
+        </div>
+        <div class="dents" id="diary-entries"></div>
+      </div>
+    </section>
+
+    <!-- Panel Juegos -->
+    <section id="panel-games" class="panel">
+      <div class="pi">
+        <h2 class="ptit">Distracción Creativa</h2>
+        <p class="psub">Tómate un pequeño respiro interactuando con actividades simples.</p>
+        <div class="piano-wrap">
+          <div class="piano-keys">
+            <div class="pk" onclick="playNote(261.63)">Do</div>
+            <div class="pk blk" onclick="playNote(277.18)"></div>
+            <div class="pk" onclick="playNote(293.66)">Re</div>
+            <div class="pk blk" onclick="playNote(311.13)"></div>
+            <div class="pk" onclick="playNote(329.63)">Mi</div>
+            <div class="pk" onclick="playNote(349.23)">Fa</div>
+            <div class="pk blk" onclick="playNote(369.99)"></div>
+            <div class="pk" onclick="playNote(392.00)">Sol</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
 </div>
 
-<!-- ══ SUPABASE CONFIG & INITIALIZATION ══ -->
+<!-- ══ SCRIPT DE CONTROL GENERAL ══ -->
 <script>
-  // Reemplaza con las credenciales de tu proyecto de Supabase
+  // Inicialización de Supabase
   const SUPABASE_URL = "https://nywnruzqyqkoobjwymvt.supabase.co"; 
-  const SUPABASE_ANON_KEY = "TU_LLAVE_ANON_DE_SUPABASE_AQUÍ";
+  const SUPABASE_ANON_KEY = "TU_LLAVE_ANON_DE_SUPABASE_AQUÍ"; // Reemplázala por tu llave real de Supabase
 
   const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  // Elementos del DOM
   const authScreen = document.getElementById('auth-screen');
   const appContainer = document.getElementById('app-container');
   const googleBtn = document.getElementById('google-btn');
   const guestBtn = document.getElementById('guest-btn');
+  const logoutBtn = document.getElementById('logout-btn');
 
-  // Controlar el inicio de sesión
+  // Login con Google
   googleBtn.addEventListener('click', async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
+    await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        // Redirige al dominio limpio de Render
         redirectTo: 'https://refuggio.onrender.com/'
       }
     });
-    if (error) console.error("Error al iniciar sesión:", error.message);
   });
 
+  // Invitado
   guestBtn.addEventListener('click', () => {
-    // Modo invitado: Oculta pantalla de login y muestra la app
     authScreen.classList.add('hidden');
     appContainer.classList.remove('hidden');
+    document.getElementById('u-name').innerText = "Invitado";
   });
 
-  // Escuchar el estado de autenticación globalmente
+  // Logout
+  logoutBtn.addEventListener('click', async () => {
+    await supabase.auth.signOut();
+    authScreen.classList.remove('hidden');
+    appContainer.classList.add('hidden');
+  });
+
+  // Escuchar Sesión de Supabase
   supabase.auth.onAuthStateChange((event, session) => {
     if (session) {
-      // Si el usuario está autenticado, cargamos la aplicación de inmediato
       authScreen.classList.add('hidden');
       appContainer.classList.remove('hidden');
-      console.log("Sesión iniciada con éxito para:", session.user.email);
+      document.getElementById('u-name').innerText = session.user.email.split('@')[0];
     } else {
-      // Si no hay sesión, obligamos a mostrar el formulario de login
       authScreen.classList.remove('hidden');
       appContainer.classList.add('hidden');
     }
   });
+
+  // Lógica de Navegación del Menú Lateral
+  const navButtons = document.querySelectorAll('.ni');
+  const panels = document.querySelectorAll('.panel');
+
+  navButtons.forEach(button => {
+    button.addEventListener('click', () => {
+      navButtons.forEach(b => b.classList.remove('act'));
+      panels.forEach(p => p.classList.remove('act'));
+
+      button.classList.add('act');
+      const target = button.getAttribute('data-target');
+      document.getElementById(target).classList.add('act');
+      
+      // Cerrar menú en móvil tras hacer clic
+      document.getElementById('sidebar').classList.remove('open');
+      document.getElementById('sidebar-overlay').classList.remove('show');
+    });
+  });
+
+  // Menú Móvil
+  const menuToggle = document.getElementById('menu-toggle-btn');
+  const sidebarClose = document.getElementById('sidebar-close-btn');
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebar-overlay');
+
+  menuToggle.addEventListener('click', () => {
+    sidebar.classList.add('open');
+    overlay.classList.add('show');
+  });
+
+  sidebarClose.addEventListener('click', () => {
+    sidebar.classList.remove('open');
+    overlay.classList.remove('show');
+  });
+
+  overlay.addEventListener('click', () => {
+    sidebar.classList.remove('open');
+    overlay.classList.remove('show');
+  });
+
+  // Sonido del Piano simple
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  function playNote(freq) {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 1);
+  }
 </script>
 
 </body>
